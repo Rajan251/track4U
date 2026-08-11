@@ -1,0 +1,15 @@
+# PersistentVolumeClaim for SQLite database storage
+# IMPORTANT: SQLite requires single-writer lock semantics. ReadWriteOnce is enforced.
+# Horizontal scaling of the API deployment is limited to 1 pod when using SQLite.
+# To scale horizontally across multiple pods, switch DATABASE_URL to PostgreSQL.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: task-manager-sqlite-pvc
+  namespace: task-manager
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

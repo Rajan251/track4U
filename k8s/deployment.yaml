@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task-manager-api
+  namespace: task-manager
+  labels:
+    app: task-manager-api
+spec:
+  # NOTE: Replicas MUST be 1 when using SQLite due to single-writer locking semantics.
+  # Do not attach an HPA (Horizontal Pod Autoscaler) to this deployment.
+  # To scale horizontally, migrate database to PostgreSQL by setting DATABASE_URL.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: task-manager-api
+  template:
+    metadata:
+      labels:
+        app: task-manager-api
+    spec:
+      containers:
+        - name: api
+          image: task-manager:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: task-manager-config
+            - secretRef:
+                name: task-manager-secret
+          volumeMounts:
+            - name: sqlite-storage
+              mountPath: /app/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: sqlite-storage
+          persistentVolumeClaim:
+            claimName: task-manager-sqlite-pvc

@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: task-manager-ingress
+  namespace: task-manager
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    # To enable cert-manager SSL, uncomment the lines below:
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  # tls:
+  #   - hosts:
+  #       - task-manager.example.com
+  #     secretName: task-manager-tls
+  rules:
+    - host: task-manager.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: task-manager-api
+                port:
+                  number: 80

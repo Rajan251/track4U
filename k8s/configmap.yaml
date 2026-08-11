@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: task-manager-config
+  namespace: task-manager
+data:
+  ENV: "production"
+  LOG_LEVEL: "INFO"
+  ALERT_THRESHOLD_DAYS: "30"
+  CORS_ORIGINS: '["http://localhost:8000"]'
+  SMTP_HOST: "smtp.gmail.com"
+  SMTP_PORT: "587"
+  ALERT_FROM_EMAIL: "alerts@example.com"

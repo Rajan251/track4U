@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: task-manager-api
+  namespace: task-manager
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  selector:
+    app: task-manager-api

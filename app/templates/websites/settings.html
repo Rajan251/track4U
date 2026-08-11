@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Settings & Billing - Track4U{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    <div>
+        <h1 class="text-3xl font-extrabold text-white tracking-tight">Settings & Preferences</h1>
+        <p class="text-slate-400 text-sm mt-1">Manage email notification preferences and organization settings</p>
+    </div>
+
+    <!-- ============================================================
+         Test Email Card
+    ============================================================ -->
+    <div class="glass-panel rounded-2xl p-6 border border-slate-800 space-y-4 shadow-xl">
+        <div class="flex items-start justify-between">
+            <div>
+                <h3 class="text-lg font-bold text-white">📧 Test Email Alert</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Verify that your SMTP configuration is working by sending a test email.</p>
+            </div>
+            <span id="smtp-badge" class="px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider
+                {% if current_user %}bg-emerald-950 text-emerald-400 border border-emerald-800{% endif %}">
+                SMTP {{ "Active" }}
+            </span>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-3 pt-1">
+            <input
+                id="test-email-addr"
+                type="email"
+                placeholder="recipient@example.com (or leave blank for ALERT_TO_EMAILS list)"
+                class="flex-1 px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-indigo-500"
+            >
+            <button
+                id="test-email-btn"
+                onclick="sendTestEmail()"
+                class="px-5 py-2.5 rounded-lg font-semibold bg-indigo-600 hover:bg-indigo-500 text-white text-sm shadow-md shadow-indigo-600/30 transition-all whitespace-nowrap"
+            >
+                Send Test Email
+            </button>
+        </div>
+
+        <!-- Result banner -->
+        <div id="test-email-result" class="hidden rounded-xl px-4 py-3 text-sm font-medium"></div>
+    </div>
+
+    <!-- User Preferences Card -->
+    <div class="glass-panel rounded-2xl p-6 border border-slate-800 space-y-4 shadow-xl">
+        <h3 class="text-lg font-bold text-white">User Notification Preferences</h3>
+        <p class="text-xs text-slate-400">Configure how you receive domain and SSL certificate expiry warnings.</p>
+
+        <form onsubmit="event.preventDefault(); updateNotificationSettings();" class="flex items-center justify-between pt-2">
+            <div>
+                <span class="block text-sm font-semibold text-slate-200">Email Expiry Alerts</span>
+                <span class="block text-xs text-slate-400">Receive email alerts when tracked domains or SSL certificates are near expiration.</span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="notify-toggle" {% if current_user.notify_on_expiry %}checked{% endif %} class="sr-only peer">
+                <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
+        </form>
+    </div>
+
+    <!-- Org & System Threshold Card -->
+    <div class="glass-panel rounded-2xl p-6 border border-slate-800 space-y-4 shadow-xl">
+        <h3 class="text-lg font-bold text-white">Organization & System Thresholds</h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Alert Threshold</div>
+                <div class="text-2xl font-bold text-indigo-400 mt-1">{{ threshold_days }} Days</div>
+                <p class="text-[11px] text-slate-500 mt-1">Configured via environment variable ALERT_THRESHOLD_DAYS</p>
+            </div>
+
+            <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Subscription Plan</div>
+                <div class="text-2xl font-bold text-emerald-400 mt-1 uppercase">{{ current_org.plan_type }}</div>
+                <p class="text-[11px] text-slate-500 mt-1">Status: {{ current_org.subscription_status }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick API Links -->
+    <div class="glass-panel rounded-2xl p-6 border border-slate-800 space-y-3 shadow-xl">
+        <h3 class="text-lg font-bold text-white">Manual Trigger (Advanced)</h3>
+        <p class="text-xs text-slate-400">Manually trigger alert checks without waiting for the scheduler. These require the Internal API token.</p>
+        <div class="flex flex-wrap gap-2 pt-1">
+            <button onclick="triggerCheck('run-expiry-checks', this)"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all">
+                Run Expiry Checks
+            </button>
+            <button onclick="triggerCheck('run-reminder-checks', this)"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all">
+                Run Reminder Checks
+            </button>
+            <button onclick="triggerCheck('run-task-alerts', this)"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all">
+                Run Task Alerts
+            </button>
+            <button onclick="triggerCheck('run-all-checks', this)"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-900 hover:bg-indigo-800 text-indigo-300 border border-indigo-700 transition-all">
+                Run All Checks
+            </button>
+        </div>
+        <div id="trigger-result" class="hidden rounded-xl px-4 py-3 text-sm font-medium mt-2"></div>
+    </div>
+</div>
+
+<script>
+/* ---------- Test Email ---------- */
+async function sendTestEmail() {
+    const btn = document.getElementById('test-email-btn');
+    const resultEl = document.getElementById('test-email-result');
+    const addr = document.getElementById('test-email-addr').value.trim();
+
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    resultEl.className = 'hidden rounded-xl px-4 py-3 text-sm font-medium';
+
+    try {
+        const body = addr ? JSON.stringify({ to_email: addr }) : '{}';
+        const res = await fetch('/api/v1/internal/send-test-email', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Internal-Token': '{{ internal_token }}'
+            },
+            body
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+            resultEl.className = 'rounded-xl px-4 py-3 text-sm font-medium bg-emerald-950 text-emerald-300 border border-emerald-800';
+            const recipients = Object.keys(data.recipients).join(', ');
+            resultEl.textContent = `✅ Test email sent to: ${recipients}`;
+        } else {
+            resultEl.className = 'rounded-xl px-4 py-3 text-sm font-medium bg-red-950 text-red-300 border border-red-800';
+            resultEl.textContent = `⚠️ ${data.message || data.detail || 'Failed to send test email'}`;
+        }
+    } catch (err) {
+        resultEl.className = 'rounded-xl px-4 py-3 text-sm font-medium bg-red-950 text-red-300 border border-red-800';
+        resultEl.textContent = `❌ Network error: ${err.message}`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Send Test Email';
+    }
+}
+
+/* ---------- Manual trigger checks ---------- */
+async function triggerCheck(endpoint, btn) {
+    const resultEl = document.getElementById('trigger-result');
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Running…';
+    resultEl.className = 'hidden rounded-xl px-4 py-3 text-sm font-medium mt-2';
+
+    try {
+        const res = await fetch(`/api/v1/internal/${endpoint}`, {
+            method: 'POST',
+            headers: { 'X-Internal-Token': '{{ internal_token }}' }
+        });
+        const data = await res.json();
+        if (res.ok) {
+            resultEl.className = 'rounded-xl px-4 py-3 text-sm font-medium bg-emerald-950 text-emerald-300 border border-emerald-800 mt-2';
+            resultEl.textContent = `✅ ${data.message}`;
+        } else {
+            resultEl.className = 'rounded-xl px-4 py-3 text-sm font-medium bg-red-950 text-red-300 border border-red-800 mt-2';
+            resultEl.textContent = `❌ ${data.detail || 'Check failed'}`;
+        }
+    } catch (err) {
+        resultEl.className = 'rounded-xl px-4 py-3 text-sm font-medium bg-red-950 text-red-300 border border-red-800 mt-2';
+        resultEl.textContent = `❌ Network error: ${err.message}`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = orig;
+    }
+}
+
+/* ---------- Notification toggle ---------- */
+async function updateNotificationSettings() {
+    const notify_on_expiry = document.getElementById("notify-toggle").checked;
+    await fetch("/api/v1/auth/me/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notify_on_expiry })
+    });
+}
+document.getElementById("notify-toggle").addEventListener("change", updateNotificationSettings);
+</script>
+{% endblock %}

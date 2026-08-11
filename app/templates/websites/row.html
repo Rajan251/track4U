@@ -1,0 +1,96 @@
+<tr id="website-row-{{ item.id }}" style="border-top:1px solid #1e2130; transition:background 0.1s;" onmouseover="this.style.background='#1e2130'" onmouseout="this.style.background=''">
+
+    <!-- Site name / URL -->
+    <td style="padding:14px 20px;">
+        <a href="/websites-view/{{ item.id }}" style="font-size:14px; font-weight:600; color:#c4c9d9; text-decoration:none; display:block; margin-bottom:2px;">
+            {{ item.label or item.url }}
+        </a>
+        <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer"
+            style="font-size:11.5px; color:#3d4460; font-family:monospace; text-decoration:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px; display:block;">
+            {{ item.url }}
+        </a>
+    </td>
+
+    <!-- Domain expiry -->
+    <td style="padding:14px 16px;">
+        {% if item.domain_expiry_date %}
+            <div style="font-size:13.5px; color:#c4c9d9; margin-bottom:4px;">{{ item.domain_expiry_date.strftime('%d %b %Y') }}</div>
+            {% set days = item.domain_days_remaining %}
+            {% if days is not none %}
+                {% if days < 0 %}
+                <span class="badge-error" style="font-size:11.5px; font-weight:600; padding:2px 8px; border-radius:4px; display:inline-block;">Expired</span>
+                {% elif days <= threshold_days %}
+                <span class="badge-warn" style="font-size:11.5px; font-weight:600; padding:2px 8px; border-radius:4px; display:inline-block;">{{ days }}d left</span>
+                {% else %}
+                <span class="badge-ok" style="font-size:11.5px; font-weight:500; padding:2px 8px; border-radius:4px; display:inline-block;">{{ days }}d</span>
+                {% endif %}
+            {% endif %}
+        {% else %}
+            <span style="font-size:12px; color:#3d4460;">—</span>
+        {% endif %}
+    </td>
+
+    <!-- SSL expiry -->
+    <td style="padding:14px 16px;">
+        {% if item.ssl_expiry_date %}
+            <div style="font-size:13.5px; color:#c4c9d9; margin-bottom:4px;">{{ item.ssl_expiry_date.strftime('%d %b %Y') }}</div>
+            {% set days = item.ssl_days_remaining %}
+            {% if days is not none %}
+                {% if days < 0 %}
+                <span class="badge-error" style="font-size:11.5px; font-weight:600; padding:2px 8px; border-radius:4px; display:inline-block;">Expired</span>
+                {% elif days <= threshold_days %}
+                <span class="badge-warn" style="font-size:11.5px; font-weight:600; padding:2px 8px; border-radius:4px; display:inline-block;">{{ days }}d left</span>
+                {% else %}
+                <span class="badge-ok" style="font-size:11.5px; font-weight:500; padding:2px 8px; border-radius:4px; display:inline-block;">{{ days }}d</span>
+                {% endif %}
+            {% endif %}
+        {% else %}
+            <span style="font-size:12px; color:#3d4460;">—</span>
+        {% endif %}
+    </td>
+
+    <!-- Last checked -->
+    <td style="padding:14px 16px; font-size:12.5px; color:#5a6380;">
+        {% if item.last_checked_at %}
+            {{ item.last_checked_at.strftime('%d %b, %H:%M') }}
+        {% else %}
+            <span style="color:#3d4460;">Never</span>
+        {% endif %}
+    </td>
+
+    <!-- Status -->
+    <td style="padding:14px 16px;">
+        {% if not item.is_active %}
+        <span class="badge-neutral" style="font-size:11.5px; padding:2px 8px; border-radius:4px; display:inline-block;">Paused</span>
+        {% elif item.last_check_status == 'ok' %}
+        <div style="display:flex; align-items:center; gap:6px;"><div class="dot-ok"></div><span style="font-size:12.5px; color:#4ade80;">OK</span></div>
+        {% elif item.last_check_status == 'error' %}
+        <div title="{{ item.last_check_error }}" style="cursor:help; display:flex; align-items:center; gap:6px;"><div class="dot-error"></div><span style="font-size:12.5px; color:#f87171;">Error</span></div>
+        {% else %}
+        <div style="display:flex; align-items:center; gap:6px;"><div class="dot-neutral"></div><span style="font-size:12.5px; color:#5a6380;">Pending</span></div>
+        {% endif %}
+    </td>
+
+    <!-- Actions -->
+    <td style="padding:14px 20px; text-align:right; white-space:nowrap;">
+        <button hx-post="/api/v1/websites/{{ item.id }}/check-now"
+            hx-target="body" hx-push-url="current"
+            class="btn-ghost" style="font-size:12px; padding:5px 10px; cursor:pointer; margin-right:4px;">
+            Check now
+        </button>
+        <button
+            onclick="openEditWebsite('{{ item.id }}', '{{ (item.label or '') | replace("'", "\\'") }}', {{ 'true' if item.is_active else 'false' }})"
+            class="btn-ghost" style="font-size:12px; padding:5px 10px; margin-right:4px;">
+            Edit
+        </button>
+        <a href="/websites-view/{{ item.id }}"
+            class="btn-ghost" style="font-size:12px; padding:5px 10px; text-decoration:none; display:inline-block; margin-right:4px;">
+            Details
+        </a>
+        <button
+            onclick="deleteWebsite('{{ item.id }}')"
+            class="btn-danger" style="font-size:12px; padding:5px 10px;">
+            Delete
+        </button>
+    </td>
+</tr>

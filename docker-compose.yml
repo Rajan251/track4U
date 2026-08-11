@@ -1,0 +1,61 @@
+# Track4U SaaS Task Manager & Website Expiry Tracker
+#
+# DATA PERSISTENCE:
+#   All SQLite data is stored in a named Docker volume: sqlite_data
+#   which maps to /app/data inside the container.
+#
+#   The host backup directory ./data/ is also bind-mounted (read-only by default
+#   when importing, writable for backup). See BACKUP section below.
+#
+# BACKUP (copy DB from volume to host):
+#   docker compose exec api cp /app/data/app.db /app/data/app.db.bak
+#   docker cp track4u_api:/app/data/app.db ./data/app.db.backup
+#
+# RESTORE from host backup:
+#   docker cp ./data/app.db.backup track4u_api:/app/data/app.db
+#   docker compose restart api
+#
+# MANUAL EXPIRY CHECK:
+#   curl -X POST http://localhost:8000/api/v1/internal/run-expiry-checks \
+#     -H "X-Internal-Token: internal-secret-token-change-in-production"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: track4u_api
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV=production
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/app.db
+      - JWT_SECRET=super-secret-jwt-key-change-in-production-123456789
+      - INTERNAL_API_TOKEN=internal-secret-token-change-in-production
+      - ALERT_THRESHOLD_DAYS=30
+    volumes:
+      # Named volume — data persists across container rebuilds and redeployments
+      - sqlite_data:/app/data
+      # Host bind mount for easy backup/restore access (./data/ on the host)
+      # If this directory doesn't exist, Docker will create it automatically
+      - ./data:/app/data/host_backup
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  sqlite_data:
+    driver: local
+    # Uncomment below to store the volume in a specific host path instead:
+    # driver_opts:
+    #   type: none
+    #   o: bind
+    #   device: /opt/track4u/data
+
+networks:
+  default:
+    name: track4u_network

@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}{{ task.title }} - Task Details{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Back Header -->
+    <div class="flex items-center justify-between">
+        <a href="/projects-view/{{ task.project_id }}" class="text-xs text-indigo-400 hover:underline">&larr; Back to Project Board</a>
+        <div class="flex items-center space-x-2">
+            <span class="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
+                Status: {{ task.status }}
+            </span>
+            <span class="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-950 text-indigo-400 border border-indigo-800">
+                Priority: {{ task.priority }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Main Card -->
+    <div class="glass-panel rounded-2xl p-8 border border-slate-800 space-y-6 shadow-xl">
+        <div>
+            <h1 class="text-3xl font-extrabold text-white">{{ task.title }}</h1>
+            <div class="flex items-center space-x-4 text-xs text-slate-400 mt-2">
+                <span>Created by {{ task.creator.full_name if task.creator else 'Unknown' }}</span>
+                <span>&bull;</span>
+                <span>Created on {{ task.created_at.strftime('%b %d, %Y') }}</span>
+                <span>&bull;</span>
+                <span>Due Date: {{ task.due_date.strftime('%b %d, %Y') if task.due_date else 'None' }}</span>
+            </div>
+        </div>
+
+        <div class="border-t border-slate-800/80 pt-4">
+            <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Description</h3>
+            <p class="text-slate-200 text-sm whitespace-pre-line leading-relaxed">
+                {{ task.description or 'No description provided for this task.' }}
+            </p>
+        </div>
+
+        <!-- ============================================================
+             Alert Settings Section
+        ============================================================ -->
+        <div class="border-t border-slate-800/80 pt-6 space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    🔔 Alert Settings
+                    <span class="text-xs font-normal text-slate-500">— email alerts before due date</span>
+                </h3>
+                <button
+                    onclick="toggleAlertEdit()"
+                    id="alert-edit-toggle"
+                    class="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all"
+                >Edit</button>
+            </div>
+
+            <!-- View mode -->
+            <div id="alert-view-mode" class="bg-slate-900/60 rounded-xl p-5 border border-slate-800 space-y-3">
+                {% if task.alert_emails %}
+                <div class="flex items-start gap-3">
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider w-28 flex-shrink-0 mt-0.5">Alert emails</span>
+                    <div class="flex flex-wrap gap-2">
+                        {% for em in task.alert_emails.split(',') %}
+                        {% if em.strip() %}
+                        <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-950 text-indigo-300 border border-indigo-800">{{ em.strip() }}</span>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider w-28 flex-shrink-0">Alert window</span>
+                    <span class="text-sm text-slate-300">{{ task.alert_days_before }} days before due date</span>
+                </div>
+                {% else %}
+                <p class="text-sm text-slate-500 italic">No alert emails configured. Click Edit to add recipients.</p>
+                {% endif %}
+            </div>
+
+            <!-- Edit mode (hidden by default) -->
+            <div id="alert-edit-mode" class="hidden bg-slate-900/60 rounded-xl p-5 border border-indigo-900/50 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                        Alert Recipient Emails
+                        <span class="font-normal normal-case text-slate-500 ml-1">(comma-separated)</span>
+                    </label>
+                    <input
+                        id="task-alert-emails"
+                        type="text"
+                        value="{{ task.alert_emails or '' }}"
+                        placeholder="e.g. alice@co.com, bob@co.com"
+                        class="w-full px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
+                    >
+                    <p class="text-[11px] text-slate-500 mt-1.5">These people receive email alerts when the task due date approaches. Leave blank to disable.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Alert Window (days before due date)</label>
+                    <input
+                        id="task-alert-days"
+                        type="number"
+                        value="{{ task.alert_days_before }}"
+                        min="1"
+                        max="60"
+                        class="w-32 px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
+                    >
+                </div>
+                <div id="alert-save-result" class="hidden rounded-lg px-3 py-2 text-xs font-medium"></div>
+                <div class="flex gap-3">
+                    <button
+                        onclick="saveAlertSettings('{{ task.id }}')"
+                        class="px-5 py-2 rounded-lg font-semibold bg-indigo-600 hover:bg-indigo-500 text-white text-sm shadow-md shadow-indigo-600/30 transition-all"
+                    >Save Alert Settings</button>
+                    <button
+                        onclick="toggleAlertEdit()"
+                        class="px-4 py-2 rounded-lg font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm border border-slate-700 transition-all"
+                    >Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comments Section -->
+        <div class="border-t border-slate-800/80 pt-6 space-y-4">
+            <h3 class="text-lg font-bold text-white">Comments &amp; Discussion</h3>
+
+            <!-- Add Comment Form -->
+            <form onsubmit="event.preventDefault(); addComment();" class="flex space-x-3">
+                <input type="text" id="comment-content" required placeholder="Write a comment..." class="flex-1 px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-indigo-500">
+                <button type="submit" class="px-5 py-2.5 rounded-lg font-semibold bg-indigo-600 hover:bg-indigo-500 text-white text-sm shadow-md shadow-indigo-600/30">
+                    Post Comment
+                </button>
+            </form>
+
+            <div class="space-y-3 pt-2" id="comments-list">
+                {% for comment in task.comments %}
+                <div class="bg-slate-900/60 rounded-xl p-4 border border-slate-800/80 space-y-1">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="font-bold text-indigo-300">{{ comment.author.full_name if comment.author else 'User' }}</span>
+                        <span class="text-slate-500">{{ comment.created_at.strftime('%b %d, %H:%M') }}</span>
+                    </div>
+                    <p class="text-slate-300 text-sm">{{ comment.content }}</p>
+                </div>
+                {% else %}
+                <p class="text-xs text-slate-500 italic">No comments yet. Start the conversation!</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Activity Log Timeline -->
+        <div class="border-t border-slate-800/80 pt-6 space-y-3">
+            <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider">Activity Log</h3>
+            <div class="space-y-2">
+                {% for log in task.activity_logs %}
+                <div class="flex items-center space-x-3 text-xs text-slate-400">
+                    <span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
+                    <span class="font-medium text-slate-300">{{ log.user.full_name if log.user else 'User' }}</span>
+                    <span>{{ log.action }}:</span>
+                    <span class="text-slate-400 italic">{{ log.details }}</span>
+                    <span class="text-slate-600 ml-auto">{{ log.created_at.strftime('%b %d, %H:%M') }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ---------- Alert settings toggle ---------- */
+function toggleAlertEdit() {
+    const viewMode = document.getElementById('alert-view-mode');
+    const editMode = document.getElementById('alert-edit-mode');
+    const btn = document.getElementById('alert-edit-toggle');
+    const isEditing = editMode.classList.contains('hidden');
+    if (isEditing) {
+        viewMode.classList.add('hidden');
+        editMode.classList.remove('hidden');
+        btn.textContent = 'Cancel';
+    } else {
+        viewMode.classList.remove('hidden');
+        editMode.classList.add('hidden');
+        btn.textContent = 'Edit';
+    }
+}
+
+/* ---------- Save alert settings via PATCH ---------- */
+async function saveAlertSettings(taskId) {
+    const resultEl = document.getElementById('alert-save-result');
+    const emails = document.getElementById('task-alert-emails').value.trim();
+    const days = parseInt(document.getElementById('task-alert-days').value, 10);
+
+    resultEl.className = 'hidden rounded-lg px-3 py-2 text-xs font-medium';
+
+    try {
+        const res = await fetch(`/api/v1/tasks/${taskId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                alert_emails: emails || null,
+                alert_days_before: isNaN(days) ? 3 : days
+            })
+        });
+        if (res.ok) {
+            resultEl.className = 'rounded-lg px-3 py-2 text-xs font-medium bg-emerald-950 text-emerald-300 border border-emerald-800';
+            resultEl.textContent = '✅ Alert settings saved.';
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            const d = await res.json();
+            resultEl.className = 'rounded-lg px-3 py-2 text-xs font-medium bg-red-950 text-red-300 border border-red-800';
+            resultEl.textContent = `❌ ${d.detail || 'Failed to save'}`;
+        }
+    } catch (err) {
+        resultEl.className = 'rounded-lg px-3 py-2 text-xs font-medium bg-red-950 text-red-300 border border-red-800';
+        resultEl.textContent = `❌ Network error: ${err.message}`;
+    }
+}
+
+/* ---------- Comments ---------- */
+async function addComment() {
+    const content = document.getElementById("comment-content").value;
+    const res = await fetch("/api/v1/tasks/{{ task.id }}/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content })
+    });
+    if (res.ok) {
+        window.location.reload();
+    } else {
+        alert("Failed to add comment");
+    }
+}
+</script>
+{% endblock %}

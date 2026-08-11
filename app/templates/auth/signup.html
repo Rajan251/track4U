@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Create account — Track4U{% endblock %}
+
+{% block content %}
+<div style="max-width:400px; margin:64px auto;">
+
+    <div style="margin-bottom:28px;">
+        <h1 style="font-size:22px; font-weight:700; color:#e8e8e8; margin:0 0 6px; letter-spacing:-0.02em;">Create your account</h1>
+        <p style="font-size:13.5px; color:#555; margin:0;">Get started with domain tracking &amp; reminders</p>
+    </div>
+
+    <div class="card" style="padding:28px;">
+        <div id="signup-error" class="err-box" style="display:none; margin-bottom:18px;"></div>
+
+        <form id="signup-form" onsubmit="event.preventDefault(); submitSignup();" style="display:flex; flex-direction:column; gap:16px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <div>
+                    <label style="display:block; font-size:11.5px; font-weight:700; color:#555; margin-bottom:7px; text-transform:uppercase; letter-spacing:0.07em;">Full Name</label>
+                    <input type="text" id="full_name" required placeholder="Jane Doe"
+                        class="field" style="width:100%; padding:10px 12px;">
+                </div>
+                <div>
+                    <label style="display:block; font-size:11.5px; font-weight:700; color:#555; margin-bottom:7px; text-transform:uppercase; letter-spacing:0.07em;">Organization</label>
+                    <input type="text" id="org_name" required placeholder="Acme Corp"
+                        class="field" style="width:100%; padding:10px 12px;">
+                </div>
+            </div>
+            <div>
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#555; margin-bottom:7px; text-transform:uppercase; letter-spacing:0.07em;">Email</label>
+                <input type="email" id="email" required placeholder="jane@acme.com"
+                    class="field" style="width:100%; padding:10px 12px;">
+            </div>
+            <div>
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#555; margin-bottom:7px; text-transform:uppercase; letter-spacing:0.07em;">Password</label>
+                <input type="password" id="password" required minlength="6"
+                    class="field" style="width:100%; padding:10px 12px;">
+                <p style="font-size:11.5px; color:#333; margin:5px 0 0;">At least 6 characters</p>
+            </div>
+            <button type="submit" class="btn-primary" style="padding:11px; font-size:14px; margin-top:4px;">
+                Create account
+            </button>
+        </form>
+    </div>
+
+    <p style="text-align:center; margin-top:20px; font-size:13px; color:#555;">
+        Already have an account?
+        <a href="/login" class="text-accent" style="font-weight:600; text-decoration:none;">Sign in</a>
+    </p>
+</div>
+
+<script>
+async function submitSignup() {
+    const errDiv = document.getElementById("signup-error");
+    errDiv.style.display = "none";
+    try {
+        const res = await fetch("/api/v1/auth/signup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                full_name: document.getElementById("full_name").value,
+                email: document.getElementById("email").value,
+                org_name: document.getElementById("org_name").value,
+                password: document.getElementById("password").value
+            })
+        });
+        if (!res.ok) {
+            const d = await res.json();
+            errDiv.textContent = d.detail || "Signup failed.";
+            errDiv.style.display = "block";
+        } else {
+            window.location.href = "/projects-view";
+        }
+    } catch {
+        errDiv.textContent = "Network error.";
+        errDiv.style.display = "block";
+    }
+}
+</script>
+{% endblock %}

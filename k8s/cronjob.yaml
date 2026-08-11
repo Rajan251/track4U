@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: website-expiry-checker
+  namespace: task-manager
+spec:
+  # Run daily at 06:00 AM UTC
+  schedule: "0 6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: expiry-check-trigger
+              image: curlimages/curl:8.7.1
+              imagePullPolicy: IfNotPresent
+              command:
+                - sh
+                - -c
+                - |
+                  echo "Triggering website & SSL expiry check run..."
+                  curl -sS -X POST "http://task-manager-api.task-manager.svc.cluster.local/api/v1/internal/run-expiry-checks" \
+                    -H "X-Internal-Token: $(INTERNAL_API_TOKEN)" \
+                    -H "Content-Type: application/json"
+                  echo "\nTrigger completed successfully."
+              env:
+                - name: INTERNAL_API_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: task-manager-secret
+                      key: INTERNAL_API_TOKEN
+          restartPolicy: OnFailure

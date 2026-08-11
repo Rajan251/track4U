@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+{% block title %}Reminders — Track4U{% endblock %}
+
+{% block content %}
+<div style="max-width:800px;">
+
+    <!-- Header -->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
+        <div>
+            <h1 style="font-size:19px; font-weight:700; color:#e8e8e8; margin:0 0 3px; letter-spacing:-0.02em;">Reminders</h1>
+            <p style="font-size:12.5px; color:#555; margin:0;">
+                Date-based alerts sent to your email twice daily (8 AM &amp; 8 PM IST)
+            </p>
+        </div>
+        <button onclick="document.getElementById('add-reminder-modal').style.display='flex'"
+            class="btn-primary" style="padding:8px 16px;">
+            + New reminder
+        </button>
+    </div>
+
+    <!-- Info strip -->
+    <div class="info-strip" style="margin-bottom:18px; font-size:13px; color:#666; line-height:1.6;">
+        Set a <strong style="color:#c8c8c8;">target date</strong> and how many days before to start alerting.
+        Emails stop automatically once the date passes.&nbsp;
+        <span class="text-accent" style="font-weight:600;">Example:</span>
+        password expires Jan 30, alert 25 days before → emails start Jan 5.
+        You can also add <strong style="color:#c8c8c8;">extra alert emails</strong> per reminder.
+    </div>
+
+    <!-- List -->
+    <div class="card" style="overflow:hidden;">
+        <div class="card-header" style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:13.5px; font-weight:600; color:#c8c8c8;">Your reminders</span>
+            <span style="font-size:12px; color:#444;">{{ reminders|length }} total</span>
+        </div>
+
+        {% if reminders %}
+        {% for r in reminders %}
+        <div id="reminder-{{ r.id }}" class="tr-hover"
+            style="padding:15px 18px; border-top:1px solid #1a1a1a; display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap;">
+
+            <!-- Status dot -->
+            <div style="flex-shrink:0; padding-top:3px;">
+                {% if not r.is_active %}
+                <div class="dot-neutral"></div>
+                {% elif r.days_remaining is not none and r.days_remaining <= 3 %}
+                <div class="dot-error"></div>
+                {% elif r.days_remaining is not none and r.days_remaining <= 7 %}
+                <div class="dot-warn"></div>
+                {% else %}
+                <div class="dot-ok"></div>
+                {% endif %}
+            </div>
+
+            <!-- Title + extra emails -->
+            <div style="flex:1; min-width:180px; overflow:hidden;">
+                <p style="font-size:14px; font-weight:600; color:{% if not r.is_active %}#444{% else %}#c8c8c8{% endif %}; margin:0 0 1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    {{ r.title }}
+                </p>
+                {% if r.description %}
+                <p style="font-size:12px; color:#444; margin:0 0 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ r.description }}</p>
+                {% endif %}
+                {% if r.alert_emails %}
+                <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+                    {% for em in r.alert_emails.split(',') %}
+                    {% if em.strip() %}
+                    <span style="font-size:10px; padding:2px 7px; background:#1a1a1a; border:1px solid #2a2a2a; border-radius:999px; color:#888;">{{ em.strip() }}</span>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Date columns -->
+            <div style="display:flex; align-items:center; gap:20px; flex-shrink:0;">
+                <div style="text-align:right;">
+                    <p style="font-size:10.5px; font-weight:700; color:#333; text-transform:uppercase; letter-spacing:0.07em; margin:0 0 2px;">Target</p>
+                    <p style="font-size:13px; color:#888; margin:0; font-family:monospace;">{{ r.target_date }}</p>
+                </div>
+                <div style="text-align:right;">
+                    <p style="font-size:10.5px; font-weight:700; color:#333; text-transform:uppercase; letter-spacing:0.07em; margin:0 0 2px;">Alert from</p>
+                    <p style="font-size:13px; color:#888; margin:0;">{{ r.remind_days_before }}d before</p>
+                </div>
+                <div style="text-align:right; min-width:52px;">
+                    <p style="font-size:10.5px; font-weight:700; color:#333; text-transform:uppercase; letter-spacing:0.07em; margin:0 0 2px;">Left</p>
+                    {% if r.days_remaining is not none %}
+                        {% if r.days_remaining < 0 %}
+                        <p style="font-size:14px; font-weight:700; color:#ef4444; margin:0;">{{ r.days_remaining }}d</p>
+                        {% elif r.days_remaining <= 3 %}
+                        <p style="font-size:14px; font-weight:700; color:#ef4444; margin:0;">{{ r.days_remaining }}d</p>
+                        {% elif r.days_remaining <= r.remind_days_before %}
+                        <p style="font-size:14px; font-weight:700; color:#eab308; margin:0;">{{ r.days_remaining }}d</p>
+                        {% else %}
+                        <p style="font-size:14px; font-weight:500; color:#444; margin:0;">{{ r.days_remaining }}d</p>
+                        {% endif %}
+                    {% else %}
+                    <p style="font-size:13px; color:#333; margin:0;">—</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+                <button
+                    onclick="openEditReminder('{{ r.id }}', '{{ r.title | replace("'", "\\'") }}', '{{ (r.description or '') | replace("'", "\\'") }}', '{{ r.target_date }}', {{ r.remind_days_before }}, '{{ r.alert_emails or '' }}')"
+                    class="btn-ghost" style="font-size:12px; padding:5px 10px;">
+                    Edit
+                </button>
+                <button
+                    hx-patch="/api/v1/reminders/{{ r.id }}"
+                    hx-vals='{"is_active": {{ "false" if r.is_active else "true" }}}'
+                    hx-target="#reminder-{{ r.id }}"
+                    hx-swap="outerHTML"
+                    hx-headers='{"Content-Type": "application/json"}'
+                    class="btn-ghost" style="font-size:12px; padding:5px 10px;">
+                    {{ 'Pause' if r.is_active else 'Resume' }}
+                </button>
+                <button
+                    hx-delete="/api/v1/reminders/{{ r.id }}"
+                    hx-target="#reminder-{{ r.id }}"
+                    hx-swap="outerHTML swap:0.2s"
+                    hx-confirm="Delete '{{ r.title }}'?"
+                    class="btn-danger" style="font-size:12px; padding:5px 10px;">
+                    Delete
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+
+        {% else %}
+        <div style="padding:56px 20px; text-align:center;">
+            <p style="font-size:13.5px; color:#444; margin:0 0 18px;">No reminders yet.</p>
+            <button onclick="document.getElementById('add-reminder-modal').style.display='flex'"
+                class="btn-primary" style="padding:9px 22px;">
+                Add your first reminder
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Reminder Modal -->
+<div id="add-reminder-modal"
+    style="display:none; position:fixed; inset:0; z-index:50; align-items:center; justify-content:center; background:rgba(0,0,0,0.85); padding:20px;">
+    <div class="card" style="width:100%; max-width:460px; padding:28px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:22px;">
+            <h3 style="font-size:16px; font-weight:700; color:#e8e8e8; margin:0; letter-spacing:-0.01em;">New reminder</h3>
+            <button onclick="document.getElementById('add-reminder-modal').style.display='none'"
+                style="background:none; border:none; color:#444; cursor:pointer; font-size:18px; line-height:1; padding:2px 6px;">✕</button>
+        </div>
+
+        <form id="add-reminder-form" style="display:flex; flex-direction:column; gap:15px;">
+            <div>
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">Title *</label>
+                <input id="r-title" type="text" placeholder="e.g. Gmail password expires"
+                    class="field" style="width:100%; padding:10px 12px;" required>
+            </div>
+            <div>
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">Notes (optional)</label>
+                <textarea id="r-desc" rows="2" placeholder="Any extra context..."
+                    class="field" style="width:100%; padding:10px 12px; resize:none;"></textarea>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <div>
+                    <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">Target date *</label>
+                    <input id="r-date" type="date" class="field" style="width:100%; padding:10px 12px;" required>
+                </div>
+                <div>
+                    <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">Alert X days before</label>
+                    <input id="r-days" type="number" value="7" min="1" max="365"
+                        class="field" style="width:100%; padding:10px 12px;">
+                </div>
+            </div>
+            <!-- NEW: Extra alert emails -->
+            <div>
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">
+                    Extra alert emails
+                    <span style="font-weight:400; text-transform:none; color:#444;">(comma-separated, optional)</span>
+                </label>
+                <input id="r-emails" type="text" placeholder="e.g. alice@co.com, bob@co.com"
+                    class="field" style="width:100%; padding:10px 12px;">
+                <p style="font-size:11px; color:#444; margin:5px 0 0;">These addresses receive the same alert as you. Your account email &amp; global alert emails are always included.</p>
+            </div>
+            <div id="reminder-error" style="display:none; font-size:13px; color:#ef4444;"></div>
+            <div style="display:flex; gap:10px; justify-content:flex-end; padding-top:4px;">
+                <button type="button"
+                    onclick="document.getElementById('add-reminder-modal').style.display='none'"
+                    class="btn-ghost" style="padding:9px 16px;">Cancel</button>
+                <button type="submit" class="btn-primary" style="padding:9px 22px;">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('add-reminder-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('reminder-error');
+    errEl.style.display = 'none';
+    const alertEmails = document.getElementById('r-emails').value.trim();
+    const payload = {
+        title: document.getElementById('r-title').value.trim(),
+        description: document.getElementById('r-desc').value.trim() || null,
+        target_date: document.getElementById('r-date').value,
+        remind_days_before: parseInt(document.getElementById('r-days').value, 10),
+        alert_emails: alertEmails || null,
+    };
+    if (!payload.title || !payload.target_date) {
+        errEl.textContent = 'Title and target date are required.';
+        errEl.style.display = 'block';
+        return;
+    }
+    try {
+        const res = await fetch('/api/v1/reminders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Failed'); }
+        window.location.reload();
+    } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+    }
+});
+
+/* ------- Edit Reminder ------- */
+function openEditReminder(id, title, description, targetDate, remindDaysBefore, alertEmails) {
+    document.getElementById('edit-r-id').value = id;
+    document.getElementById('edit-r-title').value = title;
+    document.getElementById('edit-r-desc').value = description;
+    document.getElementById('edit-r-date').value = targetDate;
+    document.getElementById('edit-r-days').value = remindDaysBefore;
+    document.getElementById('edit-r-emails').value = alertEmails;
+    document.getElementById('edit-reminder-error').style.display = 'none';
+    document.getElementById('edit-reminder-modal').style.display = 'flex';
+}
+
+document.getElementById('edit-reminder-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('edit-reminder-error');
+    errEl.style.display = 'none';
+    const id = document.getElementById('edit-r-id').value;
+    const alertEmails = document.getElementById('edit-r-emails').value.trim();
+    const payload = {
+        title: document.getElementById('edit-r-title').value.trim(),
+        description: document.getElementById('edit-r-desc').value.trim() || null,
+        target_date: document.getElementById('edit-r-date').value,
+        remind_days_before: parseInt(document.getElementById('edit-r-days').value, 10),
+        alert_emails: alertEmails || null,
+    };
+    if (!payload.title || !payload.target_date) {
+        errEl.textContent = 'Title and target date are required.';
+        errEl.style.display = 'block';
+        return;
+    }
+    try {
+        const res = await fetch(`/api/v1/reminders/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Failed'); }
+        window.location.reload();
+    } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+    }
+});
+</script>
+
+<!-- Edit Reminder Modal -->
+<div id="edit-reminder-modal"
+    style="display:none; position:fixed; inset:0; z-index:50; align-items:center; justify-content:center; background:rgba(0,0,0,0.85); padding:20px;">
+    <div class="card" style="width:100%; max-width:460px; padding:28px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:22px;">
+            <h3 style="font-size:16px; font-weight:700; color:#e8e8e8; margin:0; letter-spacing:-0.01em;">Edit reminder</h3>
+            <button onclick="document.getElementById('edit-reminder-modal').style.display='none'"
+                style="background:none; border:none; color:#444; cursor:pointer; font-size:18px; line-height:1; padding:2px 6px;">✕</button>
+        </div>
+        <form id="edit-reminder-form" style="display:flex; flex-direction:column; gap:15px;">
+            <input type="hidden" id="edit-r-id">
+            <div>
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">Title *</label>
+                <input id="edit-r-title" type="text" class="field" style="width:100%; padding:10px 12px;" required>
+            </div>
+            <div>
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">Notes (optional)</label>
+                <textarea id="edit-r-desc" rows="2" class="field" style="width:100%; padding:10px 12px; resize:none;"></textarea>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <div>
+                    <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">Target date *</label>
+                    <input id="edit-r-date" type="date" class="field" style="width:100%; padding:10px 12px;" required>
+                </div>
+                <div>
+                    <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">Alert X days before</label>
+                    <input id="edit-r-days" type="number" min="1" max="365" class="field" style="width:100%; padding:10px 12px;">
+                </div>
+            </div>
+            <div>
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">
+                    Extra alert emails
+                    <span style="font-weight:400; text-transform:none; color:#444;">(comma-separated)</span>
+                </label>
+                <input id="edit-r-emails" type="text" placeholder="e.g. alice@co.com, bob@co.com"
+                    class="field" style="width:100%; padding:10px 12px;">
+            </div>
+            <div id="edit-reminder-error" style="display:none; font-size:13px; color:#ef4444;"></div>
+            <div style="display:flex; gap:10px; justify-content:flex-end; padding-top:4px;">
+                <button type="button"
+                    onclick="document.getElementById('edit-reminder-modal').style.display='none'"
+                    class="btn-ghost" style="padding:9px 16px;">Cancel</button>
+                <button type="submit" class="btn-primary" style="padding:9px 22px;">Save changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

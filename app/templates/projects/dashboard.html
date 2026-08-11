@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Projects — Track4U{% endblock %}
+
+{% block content %}
+<div style="max-width:1000px;">
+
+    <!-- Header -->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
+        <div>
+            <h1 style="font-size:19px; font-weight:700; color:#e8e8e8; margin:0 0 3px; letter-spacing:-0.02em;">Projects</h1>
+            <p style="font-size:12.5px; color:#555; margin:0;">{{ current_org.name }}</p>
+        </div>
+        <button onclick="document.getElementById('create-project-modal').style.display='flex'"
+            class="btn-primary" style="padding:8px 16px;">
+            + New project
+        </button>
+    </div>
+
+    <!-- Grid -->
+    <div id="projects-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(270px, 1fr)); gap:12px;">
+        {% for project in projects %}
+        <div class="card" style="padding:20px; display:flex; flex-direction:column; transition:border-color 0.12s; cursor:default;"
+            onmouseover="this.style.borderColor='#333'" onmouseout="this.style.borderColor='#262626'">
+
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#444;">
+                    {{ project.status }}
+                </span>
+                <span style="font-size:12px; color:#444;">{{ project.tasks|length }} task{{ 's' if project.tasks|length != 1 }}</span>
+            </div>
+
+            <a href="/projects-view/{{ project.id }}"
+                style="font-size:14.5px; font-weight:700; color:#e8e8e8; text-decoration:none; margin-bottom:7px; display:block; letter-spacing:-0.01em;">
+                {{ project.name }}
+            </a>
+            <p style="font-size:13px; color:#555; margin:0 0 16px; flex:1; line-height:1.55;">
+                {{ project.description or 'No description.' }}
+            </p>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; padding-top:14px; border-top:1px solid #1e1e1e;">
+                <span style="font-size:11.5px; color:#333;">{{ project.created_at.strftime('%b %d, %Y') }}</span>
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <!-- Edit button -->
+                    <button
+                        onclick="openEditProject('{{ project.id }}', '{{ project.name | replace("'", "\\'") }}', '{{ (project.description or '') | replace("'", "\\'") }}', '{{ project.status }}')"
+                        class="btn-ghost" style="font-size:12px; padding:4px 10px;">
+                        Edit
+                    </button>
+                    <!-- Delete button -->
+                    <button
+                        onclick="deleteProject('{{ project.id }}')"
+                        class="btn-danger" style="font-size:12px; padding:4px 10px;">
+                        Delete
+                    </button>
+                    <a href="/projects-view/{{ project.id }}"
+                        class="text-accent" style="font-size:12.5px; font-weight:600; text-decoration:none;">
+                        Open &rarr;
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div style="grid-column:1/-1; text-align:center; padding:64px 20px;">
+            <p style="font-size:14px; color:#444; margin:0 0 18px;">No projects yet.</p>
+            <button onclick="document.getElementById('create-project-modal').style.display='flex'"
+                class="btn-primary" style="padding:9px 22px;">
+                Create your first project
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Create Project Modal -->
+<div id="create-project-modal"
+    style="display:none; position:fixed; inset:0; z-index:50; align-items:center; justify-content:center; background:rgba(0,0,0,0.8); padding:20px;">
+    <div class="card" style="width:100%; max-width:420px; padding:28px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:22px;">
+            <h3 style="font-size:16px; font-weight:700; color:#e8e8e8; margin:0; letter-spacing:-0.01em;">New project</h3>
+            <button onclick="document.getElementById('create-project-modal').style.display='none'"
+                style="background:none; border:none; color:#444; cursor:pointer; font-size:18px; line-height:1; padding:2px 6px;">✕</button>
+        </div>
+        <form onsubmit="event.preventDefault(); createProject();" style="display:flex; flex-direction:column; gap:16px;">
+            <div>
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">Name</label>
+                <input type="text" id="proj-name" required placeholder="e.g. Website Redesign"
+                    class="field" style="width:100%; padding:10px 12px;">
+            </div>
+            <div>
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">Description</label>
+                <textarea id="proj-desc" rows="3" placeholder="What is this project about?"
+                    class="field" style="width:100%; padding:10px 12px; resize:none;"></textarea>
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end; padding-top:4px;">
+                <button type="button"
+                    onclick="document.getElementById('create-project-modal').style.display='none'"
+                    class="btn-ghost" style="padding:9px 16px;">Cancel</button>
+                <button type="submit" class="btn-primary" style="padding:9px 22px;">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Project Modal -->
+<div id="edit-project-modal"
+    style="display:none; position:fixed; inset:0; z-index:50; align-items:center; justify-content:center; background:rgba(0,0,0,0.8); padding:20px;">
+    <div class="card" style="width:100%; max-width:420px; padding:28px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:22px;">
+            <h3 style="font-size:16px; font-weight:700; color:#e8e8e8; margin:0; letter-spacing:-0.01em;">Edit project</h3>
+            <button onclick="document.getElementById('edit-project-modal').style.display='none'"
+                style="background:none; border:none; color:#444; cursor:pointer; font-size:18px; line-height:1; padding:2px 6px;">✕</button>
+        </div>
+        <form onsubmit="event.preventDefault(); saveProject();" style="display:flex; flex-direction:column; gap:16px;">
+            <input type="hidden" id="edit-proj-id">
+            <div>
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">Name</label>
+                <input type="text" id="edit-proj-name" required
+                    class="field" style="width:100%; padding:10px 12px;">
+            </div>
+            <div>
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">Description</label>
+                <textarea id="edit-proj-desc" rows="3"
+                    class="field" style="width:100%; padding:10px 12px; resize:none;"></textarea>
+            </div>
+            <div>
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">Status</label>
+                <select id="edit-proj-status" class="field" style="width:100%; padding:10px 12px;">
+                    <option value="active">Active</option>
+                    <option value="on_hold">On Hold</option>
+                    <option value="completed">Completed</option>
+                    <option value="archived">Archived</option>
+                </select>
+            </div>
+            <div id="edit-proj-error" style="display:none; font-size:13px; color:#ef4444;"></div>
+            <div style="display:flex; gap:10px; justify-content:flex-end; padding-top:4px;">
+                <button type="button"
+                    onclick="document.getElementById('edit-project-modal').style.display='none'"
+                    class="btn-ghost" style="padding:9px 16px;">Cancel</button>
+                <button type="submit" class="btn-primary" style="padding:9px 22px;">Save changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+async function createProject() {
+    const name = document.getElementById("proj-name").value;
+    const description = document.getElementById("proj-desc").value;
+    const res = await fetch("/api/v1/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description })
+    });
+    if (res.ok) window.location.reload();
+    else alert("Failed to create project.");
+}
+
+function openEditProject(id, name, description, status) {
+    document.getElementById('edit-proj-id').value = id;
+    document.getElementById('edit-proj-name').value = name;
+    document.getElementById('edit-proj-desc').value = description;
+    document.getElementById('edit-proj-status').value = status;
+    document.getElementById('edit-proj-error').style.display = 'none';
+    document.getElementById('edit-project-modal').style.display = 'flex';
+}
+
+async function saveProject() {
+    const id = document.getElementById('edit-proj-id').value;
+    const errEl = document.getElementById('edit-proj-error');
+    errEl.style.display = 'none';
+    const payload = {
+        name: document.getElementById('edit-proj-name').value.trim(),
+        description: document.getElementById('edit-proj-desc').value.trim() || null,
+        status: document.getElementById('edit-proj-status').value,
+    };
+    try {
+        const res = await fetch(`/api/v1/projects/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) { window.location.reload(); }
+        else { const d = await res.json(); errEl.textContent = d.detail || 'Failed'; errEl.style.display = 'block'; }
+    } catch (e) {
+        errEl.textContent = 'Network error'; errEl.style.display = 'block';
+    }
+}
+
+async function deleteProject(id) {
+    if (!confirm('Delete this project? All tasks inside will be permanently removed.')) return;
+    const res = await fetch(`/api/v1/projects/${id}`, { method: 'DELETE' });
+    if (res.ok || res.status === 204) window.location.reload();
+    else alert('Failed to delete project.');
+}
+</script>
+{% endblock %}

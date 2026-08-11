@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Website & SSL Tracker — Track4U{% endblock %}
+
+{% block content %}
+<div style="max-width:1000px;">
+
+    <!-- Header -->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
+        <div>
+            <h1 style="font-size:19px; font-weight:700; color:#e8e8e8; margin:0 0 3px; letter-spacing:-0.02em;">Expiry Tracker</h1>
+            <p style="font-size:12.5px; color:#555; margin:0;">
+                Domain &amp; SSL monitoring for <strong style="color:#888;">{{ current_org.name }}</strong>
+                &nbsp;&middot;&nbsp; alerts {{ threshold_days }} days before expiry
+            </p>
+        </div>
+        <button onclick="triggerAllChecks()" class="btn-ghost" style="padding:7px 13px; font-size:13px;">
+            Run all checks
+        </button>
+    </div>
+
+    <!-- Add website -->
+    <div class="card" style="padding:20px; margin-bottom:16px;">
+        <p style="font-size:11px; font-weight:700; color:#444; text-transform:uppercase; letter-spacing:0.07em; margin:0 0 13px;">Add a website to track</p>
+        <form id="add-website-form" onsubmit="event.preventDefault(); addWebsite();"
+            style="display:grid; grid-template-columns:1fr 1fr auto; gap:10px; align-items:end;">
+            <div>
+                <label style="display:block; font-size:11.5px; color:#555; margin-bottom:5px;">URL *</label>
+                <input type="url" id="web-url" required placeholder="https://example.com"
+                    class="field" style="width:100%; padding:9px 11px;">
+            </div>
+            <div>
+                <label style="display:block; font-size:11.5px; color:#555; margin-bottom:5px;">Label (optional)</label>
+                <input type="text" id="web-label" placeholder="Main site"
+                    class="field" style="width:100%; padding:9px 11px;">
+            </div>
+            <button type="submit" class="btn-primary" style="padding:9px 16px; white-space:nowrap;">
+                Add &amp; check
+            </button>
+        </form>
+        <div id="add-error" style="display:none; font-size:13px; color:#ef4444; margin-top:10px;"></div>
+    </div>
+
+    <!-- Table -->
+    <div class="card" style="overflow:hidden;">
+        <div class="card-header" style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:13.5px; font-weight:600; color:#c8c8c8;">Tracked websites</span>
+            <span style="font-size:12px; color:#444;">{{ websites|length }} site{{ 's' if websites|length != 1 }}</span>
+        </div>
+        <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr style="border-bottom:1px solid #1e1e1e;">
+                        <th style="padding:11px 18px; text-align:left;">Site</th>
+                        <th style="padding:11px 14px; text-align:left;">Domain expiry</th>
+                        <th style="padding:11px 14px; text-align:left;">SSL expiry</th>
+                        <th style="padding:11px 14px; text-align:left;">Last checked</th>
+                        <th style="padding:11px 14px; text-align:left;">Status</th>
+                        <th style="padding:11px 18px; text-align:right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="websites-tbody">
+                    {% for item in websites %}
+                    {% include "websites/row.html" %}
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="padding:48px 18px; text-align:center; color:#333; font-size:13.5px;">
+                            No websites tracked yet. Add one above.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Website Modal -->
+<div id="edit-website-modal"
+    style="display:none; position:fixed; inset:0; z-index:50; align-items:center; justify-content:center; background:rgba(0,0,0,0.85); padding:20px;">
+    <div class="card" style="width:100%; max-width:400px; padding:28px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:22px;">
+            <h3 style="font-size:16px; font-weight:700; color:#e8e8e8; margin:0;">Edit Website</h3>
+            <button onclick="document.getElementById('edit-website-modal').style.display='none'"
+                style="background:none; border:none; color:#444; cursor:pointer; font-size:18px; line-height:1; padding:2px 6px;">✕</button>
+        </div>
+        <form onsubmit="event.preventDefault(); saveWebsite();" style="display:flex; flex-direction:column; gap:15px;">
+            <input type="hidden" id="edit-web-id">
+            <div>
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#555; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:7px;">Label</label>
+                <input type="text" id="edit-web-label" placeholder="e.g. Main site"
+                    class="field" style="width:100%; padding:10px 12px;">
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <input type="checkbox" id="edit-web-active" style="width:16px; height:16px; cursor:pointer;">
+                <label for="edit-web-active" style="font-size:13px; color:#c8c8c8; cursor:pointer;">Active monitoring</label>
+            </div>
+            <div id="edit-web-error" style="display:none; font-size:13px; color:#ef4444;"></div>
+            <div style="display:flex; gap:10px; justify-content:flex-end; padding-top:4px;">
+                <button type="button"
+                    onclick="document.getElementById('edit-website-modal').style.display='none'"
+                    class="btn-ghost" style="padding:9px 16px;">Cancel</button>
+                <button type="submit" class="btn-primary" style="padding:9px 22px;">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+async function addWebsite() {
+    const errEl = document.getElementById("add-error");
+    errEl.style.display = "none";
+    const res = await fetch("/api/v1/websites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            url: document.getElementById("web-url").value,
+            label: document.getElementById("web-label").value
+        })
+    });
+    if (res.ok) { window.location.reload(); }
+    else { const e = await res.json(); errEl.textContent = e.detail || "Failed."; errEl.style.display = "block"; }
+}
+
+async function triggerAllChecks() {
+    const res = await fetch("/api/v1/internal/run-expiry-checks", {
+        method: "POST",
+        headers: { "X-Internal-Token": "{{ internal_token }}" }
+    });
+    if (res.ok) window.location.reload();
+    else alert("Check failed — see server logs.");
+}
+
+function openEditWebsite(id, label, isActive) {
+    document.getElementById('edit-web-id').value = id;
+    document.getElementById('edit-web-label').value = label;
+    document.getElementById('edit-web-active').checked = isActive;
+    document.getElementById('edit-web-error').style.display = 'none';
+    document.getElementById('edit-website-modal').style.display = 'flex';
+}
+
+async function saveWebsite() {
+    const id = document.getElementById('edit-web-id').value;
+    const errEl = document.getElementById('edit-web-error');
+    errEl.style.display = 'none';
+    try {
+        const res = await fetch(`/api/v1/websites/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                label: document.getElementById('edit-web-label').value.trim() || null,
+                is_active: document.getElementById('edit-web-active').checked
+            })
+        });
+        if (res.ok) { window.location.reload(); }
+        else { const d = await res.json(); errEl.textContent = d.detail || 'Failed'; errEl.style.display = 'block'; }
+    } catch (e) {
+        errEl.textContent = 'Network error'; errEl.style.display = 'block';
+    }
+}
+
+async function deleteWebsite(id) {
+    if (!confirm('Remove this website from tracking? This will delete all alert history for it.')) return;
+    const res = await fetch(`/api/v1/websites/${id}`, { method: 'DELETE' });
+    if (res.ok || res.status === 204) window.location.reload();
+    else alert('Failed to delete website.');
+}
+</script>
+{% endblock %}

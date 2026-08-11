@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.name }} - Kanban Board{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-5">
+        <div>
+            <div class="flex items-center space-x-3">
+                <a href="/projects-view" class="text-xs text-indigo-400 hover:underline">&larr; Back to Projects</a>
+                <span class="text-slate-600">/</span>
+                <span class="text-xs text-slate-400 font-mono">{{ project.id[:8] }}</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-white tracking-tight mt-1">{{ project.name }}</h1>
+            <p class="text-slate-400 text-sm mt-1">{{ project.description or 'No description' }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="openEditProjectModal()" class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+                ✏️ Edit Project
+            </button>
+            <button onclick="document.getElementById('create-task-modal').classList.remove('hidden')" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Add Task
+            </button>
+        </div>
+    </div>
+
+    <!-- Kanban Board Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- TODO COLUMN -->
+        <div class="glass-panel rounded-xl p-4 border border-slate-800 flex flex-col min-h-[500px]">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                <div class="flex items-center space-x-2">
+                    <span class="w-3 h-3 rounded-full bg-slate-400"></span>
+                    <h3 class="font-bold text-slate-200 text-sm uppercase tracking-wider">To Do</h3>
+                </div>
+                <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                    {{ todo_tasks|length }}
+                </span>
+            </div>
+
+            <div class="space-y-3 flex-1">
+                {% for task in todo_tasks %}
+                {% include "tasks/card.html" %}
+                {% else %}
+                <div class="text-center py-8 text-xs text-slate-500 italic">No tasks to do</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- IN PROGRESS COLUMN -->
+        <div class="glass-panel rounded-xl p-4 border border-slate-800 flex flex-col min-h-[500px]">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                <div class="flex items-center space-x-2">
+                    <span class="w-3 h-3 rounded-full bg-amber-400 animate-pulse"></span>
+                    <h3 class="font-bold text-slate-200 text-sm uppercase tracking-wider">In Progress</h3>
+                </div>
+                <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-950/60 text-amber-400 border border-amber-800/50">
+                    {{ in_progress_tasks|length }}
+                </span>
+            </div>
+
+            <div class="space-y-3 flex-1">
+                {% for task in in_progress_tasks %}
+                {% include "tasks/card.html" %}
+                {% else %}
+                <div class="text-center py-8 text-xs text-slate-500 italic">No tasks in progress</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- DONE COLUMN -->
+        <div class="glass-panel rounded-xl p-4 border border-slate-800 flex flex-col min-h-[500px]">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                <div class="flex items-center space-x-2">
+                    <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
+                    <h3 class="font-bold text-slate-200 text-sm uppercase tracking-wider">Done</h3>
+                </div>
+                <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">
+                    {{ done_tasks|length }}
+                </span>
+            </div>
+
+            <div class="space-y-3 flex-1">
+                {% for task in done_tasks %}
+                {% include "tasks/card.html" %}
+                {% else %}
+                <div class="text-center py-8 text-xs text-slate-500 italic">No completed tasks</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Task Modal -->
+<div id="create-task-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="glass-panel w-full max-w-lg rounded-2xl p-6 border border-slate-800 shadow-2xl">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-xl font-bold text-white">Create New Task</h3>
+            <button onclick="document.getElementById('create-task-modal').classList.add('hidden')" class="text-slate-400 hover:text-white">✕</button>
+        </div>
+        <form onsubmit="event.preventDefault(); createTask();" class="space-y-4">
+            <input type="hidden" id="task-project-id" value="{{ project.id }}">
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Task Title *</label>
+                <input type="text" id="task-title" required placeholder="e.g. Implement OAuth Flow" class="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Description</label>
+                <textarea id="task-desc" rows="3" placeholder="Task details..." class="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-indigo-500"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Priority</label>
+                    <select id="task-priority" class="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Due Date</label>
+                    <input type="date" id="task-due-date" class="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                    Manual Alert Emails <span class="font-normal text-slate-500 normal-case">(optional, comma-separated)</span>
+                </label>
+                <input type="text" id="task-alert-emails" placeholder="e.g. person1@co.com, person2@co.com" class="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-indigo-500">
+                <p class="text-[11px] text-slate-500 mt-1">Status changes &amp; due date alerts will be emailed to these addresses.</p>
+            </div>
+            <div class="flex justify-end space-x-3 pt-2">
+                <button type="button" onclick="document.getElementById('create-task-modal').classList.add('hidden')" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30">Create Task</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Task Modal -->
+<div id="edit-task-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="glass-panel w-full max-w-lg rounded-2xl p-6 border border-slate-800 shadow-2xl">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-xl font-bold text-white">Edit Task</h3>
+            <button onclick="document.getElementById('edit-task-modal').classList.add('hidden')" class="text-slate-400 hover:text-white">✕</button>
+        </div>
+        <form onsubmit="event.preventDefault(); saveEditTask();" class="space-y-4">
+            <input type="hidden" id="edit-task-id">
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Task Title *</label>
+                <input type="text" id="edit-task-title" required class="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Description</label>
+                <textarea id="edit-task-desc" rows="3" class="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-indigo-500"></textarea>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Status</label>
+                    <select id="edit-task-status" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-indigo-500">
+                        <option value="todo">To Do</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="done">Done</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Priority</label>
+                    <select id="edit-task-priority" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-indigo-500">
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Due Date</label>
+                    <input type="date" id="edit-task-due-date" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                    Manual Alert Emails <span class="font-normal text-slate-500 normal-case">(optional, comma-separated)</span>
+                </label>
+                <input type="text" id="edit-task-alert-emails" placeholder="e.g. person1@co.com, person2@co.com" class="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-indigo-500">
+                <p class="text-[11px] text-slate-500 mt-1">Status changes &amp; due date alerts will be emailed to these addresses.</p>
+            </div>
+            <p id="edit-task-error" class="hidden text-xs text-red-400"></p>
+            <div class="flex justify-between items-center pt-2">
+                <button type="button" onclick="deleteTask(document.getElementById('edit-task-id').value, document.getElementById('edit-task-title').value)" class="px-3 py-2 rounded-lg text-xs font-semibold bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800/50">
+                    🗑️ Delete Task
+                </button>
+                <div class="flex space-x-3">
+                    <button type="button" onclick="document.getElementById('edit-task-modal').classList.add('hidden')" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800">Cancel</button>
+                    <button type="submit" class="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30">Save Changes</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Project Modal -->
+<div id="edit-project-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="glass-panel w-full max-w-md rounded-2xl p-6 border border-slate-800 shadow-2xl">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-xl font-bold text-white">Edit Project</h3>
+            <button onclick="document.getElementById('edit-project-modal').classList.add('hidden')" class="text-slate-400 hover:text-white">✕</button>
+        </div>
+        <form onsubmit="event.preventDefault(); saveEditProject();" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Project Name</label>
+                <input type="text" id="edit-project-name" value="{{ project.name }}" required
+                    class="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Description</label>
+                <textarea id="edit-project-desc" rows="3"
+                    class="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-indigo-500">{{ project.description or '' }}</textarea>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Status</label>
+                <select id="edit-project-status"
+                    class="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:outline-none focus:border-indigo-500">
+                    <option value="active" {{ 'selected' if project.status == 'active' }}>Active</option>
+                    <option value="on_hold" {{ 'selected' if project.status == 'on_hold' }}>On Hold</option>
+                    <option value="completed" {{ 'selected' if project.status == 'completed' }}>Completed</option>
+                    <option value="archived" {{ 'selected' if project.status == 'archived' }}>Archived</option>
+                </select>
+            </div>
+            <p id="edit-project-error" class="hidden text-xs text-red-400"></p>
+            <div class="flex justify-end space-x-3 pt-2">
+                <button type="button" onclick="document.getElementById('edit-project-modal').classList.add('hidden')" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+async function createTask() {
+    const project_id = document.getElementById("task-project-id").value;
+    const title = document.getElementById("task-title").value;
+    const description = document.getElementById("task-desc").value;
+    const priority = document.getElementById("task-priority").value;
+    const due_date = document.getElementById("task-due-date").value || null;
+    const alert_emails = document.getElementById("task-alert-emails").value.trim() || null;
+
+    const res = await fetch("/api/v1/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id, title, description, priority, due_date, alert_emails })
+    });
+    if (res.ok) {
+        window.location.reload();
+    } else {
+        alert("Failed to create task");
+    }
+}
+
+async function updateTaskStatus(taskId, newStatus) {
+    try {
+        const res = await fetch(`/api/v1/tasks/${taskId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: newStatus })
+        });
+        if (res.ok) {
+            window.location.reload();
+        } else {
+            let errMsg = "Failed to update status";
+            try {
+                const d = await res.json();
+                errMsg = d.detail || errMsg;
+            } catch (e) {
+                const text = await res.text();
+                errMsg = text || `Server error (${res.status})`;
+            }
+            alert("Error: " + errMsg);
+        }
+    } catch (e) {
+        alert("Network error: " + e.message);
+    }
+}
+
+function openEditTaskModal(id, title, description, status, priority, dueDate, alertEmails, alertDays) {
+    document.getElementById('edit-task-id').value = id;
+    document.getElementById('edit-task-title').value = title;
+    document.getElementById('edit-task-desc').value = description;
+    document.getElementById('edit-task-status').value = status;
+    document.getElementById('edit-task-priority').value = priority;
+    document.getElementById('edit-task-due-date').value = dueDate;
+    document.getElementById('edit-task-alert-emails').value = alertEmails;
+    document.getElementById('edit-task-error').classList.add('hidden');
+    document.getElementById('edit-task-modal').classList.remove('hidden');
+}
+
+async function saveEditTask() {
+    const taskId = document.getElementById('edit-task-id').value;
+    const errEl = document.getElementById('edit-task-error');
+    errEl.classList.add('hidden');
+    const payload = {
+        title: document.getElementById('edit-task-title').value.trim(),
+        description: document.getElementById('edit-task-desc').value.trim() || null,
+        status: document.getElementById('edit-task-status').value,
+        priority: document.getElementById('edit-task-priority').value,
+        due_date: document.getElementById('edit-task-due-date').value || null,
+        alert_emails: document.getElementById('edit-task-alert-emails').value.trim() || null,
+    };
+    if (!payload.title) {
+        errEl.textContent = 'Title is required.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    try {
+        const res = await fetch(`/api/v1/tasks/${taskId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+            window.location.reload();
+        } else {
+            let errMsg = 'Failed to save task';
+            try {
+                const d = await res.json();
+                errMsg = d.detail || errMsg;
+            } catch (jsonErr) {
+                const text = await res.text();
+                errMsg = text || `Server error (${res.status})`;
+            }
+            errEl.textContent = errMsg;
+            errEl.classList.remove('hidden');
+        }
+    } catch (e) {
+        errEl.textContent = 'Network error: ' + e.message;
+        errEl.classList.remove('hidden');
+    }
+}
+
+async function deleteTask(taskId, taskTitle) {
+    if (!confirm(`Are you sure you want to delete task "${taskTitle}"?`)) return;
+    try {
+        const res = await fetch(`/api/v1/tasks/${taskId}`, { method: 'DELETE' });
+        if (res.ok || res.status === 204) {
+            window.location.reload();
+        } else {
+            alert("Failed to delete task");
+        }
+    } catch (e) {
+        alert("Network error: " + e.message);
+    }
+}
+
+function openEditProjectModal() {
+    document.getElementById('edit-project-modal').classList.remove('hidden');
+}
+
+async function saveEditProject() {
+    const errEl = document.getElementById('edit-project-error');
+    errEl.classList.add('hidden');
+    const payload = {
+        name: document.getElementById('edit-project-name').value.trim(),
+        description: document.getElementById('edit-project-desc').value.trim() || null,
+        status: document.getElementById('edit-project-status').value,
+    };
+    if (!payload.name) { errEl.textContent = 'Name is required.'; errEl.classList.remove('hidden'); return; }
+    try {
+        const res = await fetch('/api/v1/projects/{{ project.id }}', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) { window.location.reload(); }
+        else { const d = await res.json(); errEl.textContent = d.detail || 'Failed'; errEl.classList.remove('hidden'); }
+    } catch (e) {
+        errEl.textContent = 'Network error'; errEl.classList.remove('hidden');
+    }
+}
+</script>
+{% endblock %}

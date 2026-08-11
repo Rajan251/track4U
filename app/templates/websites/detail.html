@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}{{ website.label or website.url }} - Website Details{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <a href="/websites-view" class="text-xs text-indigo-400 hover:underline">&larr; Back to Website Tracker</a>
+        <div class="flex items-center space-x-3">
+            <button hx-patch="/api/v1/websites/{{ website.id }}" hx-ext="json-enc" hx-vals='{"is_active": {{ 'false' if website.is_active else 'true' }}}' hx-target="body" hx-push-url="current" class="px-3 py-1.5 rounded-lg text-xs font-semibold {% if website.is_active %}bg-amber-950/80 text-amber-300 border border-amber-800{% else %}bg-emerald-950/80 text-emerald-300 border border-emerald-800{% endif %}">
+                {% if website.is_active %}Pause Monitoring{% else %}Resume Monitoring{% endif %}
+            </button>
+            <button hx-post="/api/v1/websites/{{ website.id }}/check-now" hx-target="body" hx-push-url="current" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30">
+                Check Now
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Detail Card -->
+    <div class="glass-panel rounded-2xl p-8 border border-slate-800 space-y-6 shadow-xl">
+        <div class="flex items-start justify-between">
+            <div>
+                <h1 class="text-3xl font-extrabold text-white">{{ website.label or website.url }}</h1>
+                <p class="text-indigo-400 font-mono text-sm mt-1">
+                    <a href="{{ website.url }}" target="_blank" rel="noopener" class="hover:underline">{{ website.url }}</a>
+                </p>
+            </div>
+            <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider {% if website.is_active %}bg-emerald-950 text-emerald-400 border border-emerald-800{% else %}bg-slate-800 text-slate-400{% endif %}">
+                {{ 'Active' if website.is_active else 'Paused' }}
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800/80">
+            <!-- Domain Info -->
+            <div class="bg-slate-900/60 rounded-xl p-5 border border-slate-800/80 space-y-2">
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">🌐 Domain Expiry (WHOIS)</div>
+                <div class="text-2xl font-bold text-white">
+                    {{ website.domain_expiry_date.strftime('%Y-%m-%d') if website.domain_expiry_date else 'N/A' }}
+                </div>
+                {% if website.domain_days_remaining is not none %}
+                <div class="text-xs font-medium text-slate-300">
+                    Days Remaining: <strong class="text-indigo-400">{{ website.domain_days_remaining }} days</strong>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- SSL Info -->
+            <div class="bg-slate-900/60 rounded-xl p-5 border border-slate-800/80 space-y-2">
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">🔒 SSL Certificate Expiry</div>
+                <div class="text-2xl font-bold text-white">
+                    {{ website.ssl_expiry_date.strftime('%Y-%m-%d') if website.ssl_expiry_date else 'N/A' }}
+                </div>
+                {% if website.ssl_days_remaining is not none %}
+                <div class="text-xs font-medium text-slate-300">
+                    Days Remaining: <strong class="text-indigo-400">{{ website.ssl_days_remaining }} days</strong>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if website.last_check_error %}
+        <div class="p-4 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-300 text-xs">
+            <strong class="font-bold">Last Check Error:</strong> {{ website.last_check_error }}
+        </div>
+        {% endif %}
+
+        <!-- Alert History Log -->
+        <div class="pt-4 border-t border-slate-800/80 space-y-4">
+            <h3 class="text-lg font-bold text-white">Alert History Log</h3>
+            <div class="overflow-x-auto rounded-xl border border-slate-800">
+                <table class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="border-b border-slate-800 bg-slate-900/80 text-slate-400 uppercase tracking-wider font-bold">
+                            <th class="py-3 px-4">Alert Type</th>
+                            <th class="py-3 px-4">Days Remaining</th>
+                            <th class="py-3 px-4">Sent At</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800">
+                        {% for log in website.alert_logs %}
+                        <tr class="hover:bg-slate-900/40">
+                            <td class="py-3 px-4 font-bold uppercase text-amber-400">{{ log.alert_type }}</td>
+                            <td class="py-3 px-4 font-mono text-slate-200">{{ log.days_remaining_at_alert }} days</td>
+                            <td class="py-3 px-4 text-slate-400">{{ log.sent_at.strftime('%Y-%m-%d %H:%M UTC') }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="3" class="py-6 text-center text-slate-500 italic">No alert history recorded yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
