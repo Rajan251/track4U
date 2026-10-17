@@ -1,0 +1,97 @@
+name: Deploy Track4U
+
+on:
+  push:
+    branches:
+      - v1.1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track4u-server-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy Track4U
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, track4u-server]
+    timeout-minutes: 30
+
+    env:
+      ENV_FILE: /opt/track4u/production.env
+      IMAGE_TAG: ${{ github.sha }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify deployment prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f docker-compose.yml
+          test -f Dockerfile
+          test -r "$ENV_FILE"
+          test -d /opt/track4u/backups
+
+          docker info >/dev/null
+          docker compose version
+
+          docker compose \
+            --env-file "$ENV_FILE" \
+            -f docker-compose.yml \
+            config --quiet
+
+      - name: Build application image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker compose \
+            --env-file "$ENV_FILE" \
+            -f docker-compose.yml \
+            build --pull api
+
+      - name: Deploy and wait for healthy application
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker compose \
+            --env-file "$ENV_FILE" \
+            -f docker-compose.yml \
+            up \
+            -d \
+            --no-build \
+            --wait \
+            --wait-timeout 180 \
+            api
+
+      - name: Show deployment status
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker compose \
+            --env-file "$ENV_FILE" \
+            -f docker-compose.yml \
+            ps
+
+          echo "Deployed commit: $GITHUB_SHA"
+
+      - name: Show diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          docker ps -a \
+            --filter "name=^/track4u_api$"
+
+          docker logs \
+            --tail 100 \
+            track4u_api || true
